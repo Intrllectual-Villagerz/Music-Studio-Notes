@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Intellectual Villages – Dynamic Studio Ops</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+body { margin:0; font-family:Arial,sans-serif; background:#0e1022; color:#fff; }
+header { background:#161a3a; padding:15px; text-align:center; font-size:18px; }
+.card { background:#1a1e3f; margin:15px; padding:15px; border-radius:10px; }
+.hidden { display:none; }
+input, select, textarea, button { width:100%; padding:8px; margin:6px 0; border-radius:6px; border:none; }
+button { background:#6cf; cursor:pointer; }
+.good { color:#6f6; } .mid { color:#fc6; } .bad { color:#f66; }
+.spec-box { background:#121532; padding:8px; border-radius:6px; margin-top:6px; }
+.spec-row { font-size:13px; border-bottom:1px solid #2a2f66; padding:4px 0; }
+.remove { background:#f44; margin-top:6px; }
+.remove-small { background:#f44; font-size:12px; margin-left:6px; }
+.category-title { font-weight:bold; color:#6cf; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<header>🎧 Intellectual Villages – Music Studio Notes</header>
+
+<!-- LOGIN -->
+<div class="card" id="login">
+    <select id="role">
+        <option value="employee">Employee</option>
+        <option value="admin">Admin</option>
+    </select>
+    <button onclick="loginUser()">Login</button>
+</div>
+
+<!-- EMPLOYEE DASHBOARD -->
+<div class="card hidden" id="employee">
+    <!-- Switch Button -->
+    <button id="switchBtn" style="background:#fc6;color:#000;margin-top:10px;" onclick="switchDashboard()">Switch Dashboard</button>
+    <h3>Studio Visit</h3>
+    <input id="studioName" placeholder="Studio Name">
+    <input id="location" placeholder="Location">
+    <div id="dynamicFields"></div>
+    <textarea id="notes" placeholder="Extra notes"></textarea>
+    <button onclick="saveStudio()">Submit Studio</button>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div class="card hidden" id="admin">
+    <!-- Switch Button -->
+    <button id="switchBtn" style="background:#fc6;color:#000;margin-top:10px;" onclick="switchDashboard()">Switch Dashboard</button>
+    <h3>Analytics & Studios</h3>
+    <div id="analytics"></div>
+    <div id="studioList"></div>
+    <h3>Manage Categories</h3>
+    <input id="newCategory" placeholder="New Category Name">
+    <button onclick="addCategory()">Add Category</button>
+    <div id="categories"></div>
+    <hr>
+
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+let role = "";
+let studios = JSON.parse(localStorage.getItem("studios")||"[]");
+let config = JSON.parse(localStorage.getItem("config")||JSON.stringify([
+  { name:"Mic", options:["None","Condenser XLR"] },
+  { name:"Interface", options:["None","Pro Interface"] },
+  { name:"RAM", options:["8GB","16GB+"] },
+  { name:"Storage", options:["HDD","SSD 512GB+"] },
+  { name:"Booth", options:["Poor","Treated"] },
+  { name:"Software", options:["Unlicensed","Licensed"] }
+]));
+
+/* ---------------- LOGIN ---------------- */
+function loginUser(){
+  role = document.getElementById("role").value;
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById(role).classList.remove("hidden");
+  if(role==="employee") renderEmployee();
+  if(role==="admin") renderAdmin();
+}
+
+/* ---------------- EMPLOYEE ---------------- */
+function renderEmployee(){
+  const container = document.getElementById("dynamicFields");
+  container.innerHTML = "";
+  config.forEach((cat, i) => {
+    let label = document.createElement("div");
+    label.classList.add("category-title");
+    label.textContent = cat.name;
+
+    let select = document.createElement("select");
+    select.id = "field_"+i;
+    cat.options.forEach(opt => {
+      let o = document.createElement("option");
+      o.textContent = opt;
+      select.appendChild(o);
+    });
+
+    container.appendChild(label);
+    container.appendChild(select);
+  });
+}
+
+function saveStudio(){
+  let details = {};
+  let score = 0;
+  config.forEach((cat,i)=>{
+    let sel = document.getElementById("field_"+i);
+    details[cat.name] = sel.value;
+    score += sel.selectedIndex;
+  });
+  let percent = Math.round(score/config.length*100);
+  studios.push({
+    name: document.getElementById("studioName").value,
+    location: document.getElementById("location").value,
+    score: percent,
+    details: details,
+    notes: document.getElementById("notes").value,
+    status: "Prospect"
+  });
+  localStorage.setItem("studios",JSON.stringify(studios));
+  alert("Studio submitted ✔");
+  renderEmployee();
+}
+
+/* ---------------- ADMIN ---------------- */
+function renderAdmin(){
+  const catDiv = document.getElementById("categories");
+  catDiv.innerHTML = "";
+  config.forEach((cat,i)=>{
+    let div = document.createElement("div");
+    div.classList.add("card");
+
+    // Category header
+    let header = document.createElement("div");
+    header.classList.add("category-title");
+    header.textContent = cat.name;
+    let rmCat = document.createElement("button");
+    rmCat.classList.add("remove-small");
+    rmCat.textContent = "Remove Category";
+    rmCat.onclick = ()=>{
+      config.splice(i,1);
+      saveConfig();
+      renderAdmin();
+      renderEmployee();
+    };
+    header.appendChild(rmCat);
+    div.appendChild(header);
+
+    // Options list
+    cat.options.forEach((opt,j)=>{
+      let optDiv = document.createElement("div");
+      optDiv.textContent = opt;
+      let rmOpt = document.createElement("button");
+      rmOpt.textContent = "X";
+      rmOpt.classList.add("remove-small");
+      rmOpt.onclick = ()=>{
+        cat.options.splice(j,1);
+        saveConfig();
+        renderAdmin();
+        renderEmployee();
+      };
+      optDiv.appendChild(rmOpt);
+      div.appendChild(optDiv);
+    });
+
+    // Add new option
+    let inp = document.createElement("input");
+    inp.placeholder="Add new option";
+    let btn = document.createElement("button");
+    btn.textContent="Add Option";
+    btn.onclick = ()=>{
+      if(inp.value){ cat.options.push(inp.value); saveConfig(); renderAdmin(); renderEmployee(); inp.value=""; }
+    };
+    div.appendChild(inp); div.appendChild(btn);
+
+    catDiv.appendChild(div);
+  });
+
+  // Analytics
+  const analytics = document.getElementById("analytics");
+  const studioList = document.getElementById("studioList");
+  let total = studios.length;
+  let avg = total ? Math.round(studios.reduce((a,s)=>a+s.score,0)/total) : 0;
+  analytics.innerHTML = `<strong>Total Studios:</strong> ${total}<br><strong>Avg Compatibility:</strong> ${avg}%`;
+
+  // Render Studios
+  studioList.innerHTML="";
+  studios.forEach((s,i)=>{
+    let color = s.score>70?"good":s.score>40?"mid":"bad";
+    let specs="";
+    Object.keys(s.details).forEach(k=>{
+      specs+=`<div class="spec-row"><strong>${k}:</strong> ${s.details[k]}</div>`;
+    });
+    studioList.innerHTML+=`
+      <div class="card">
+        <strong>${s.name}</strong> – ${s.location}<br>
+        Compatibility: <span class="${color}">${s.score}%</span>
+        <div class="spec-box"><strong>Equipment & Specs</strong>${specs}</div>
+        <div class="spec-box"><strong>Notes:</strong><br>${s.notes||"—"}</div>
+        Status:
+        <select onchange="updateStatus(${i},this.value)">
+          ${["Prospect","Negotiating","Partnered","Rejected"].map(st=>`<option ${s.status===st?"selected":""}>${st}</option>`)}
+        </select>
+      </div>
+    `;
+  });
+}
+
+/* ---------------- CATEGORY MANAGEMENT ---------------- */
+function addCategory(){
+  const name=document.getElementById("newCategory").value;
+  if(!name) return;
+  config.push({name:name, options:[]});
+  document.getElementById("newCategory").value="";
+  saveConfig();
+  renderAdmin();
+  renderEmployee();
+}
+
+function saveConfig(){
+  localStorage.setItem("config",JSON.stringify(config));
+}
+
+/* ---------------- STUDIO STATUS ---------------- */
+function updateStatus(i,val){
+  if(val==="Rejected"){ studios.splice(i,1); }
+  else{ studios[i].status=val; }
+  localStorage.setItem("studios",JSON.stringify(studios));
+  renderAdmin();
+}
+
+function removeStudio(i){
+  studios.splice(i,1);
+  localStorage.setItem("studios",JSON.stringify(studios));
+  renderAdmin();
+}
+
+function switchDashboard() {
+  if(role === "employee") {
+    // Hide employee, show admin
+    document.getElementById("employee").classList.add("hidden");
+    document.getElementById("admin").classList.remove("hidden");
+    role = "admin";
+    renderAdmin();
+  } else if(role === "admin") {
+    // Hide admin, show employee
+    document.getElementById("admin").classList.add("hidden");
+    document.getElementById("employee").classList.remove("hidden");
+    role = "employee";
+    renderEmployee();
+  }
+}
+
+</script>
+
+</body>
+</html>
